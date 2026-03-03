@@ -1,5 +1,5 @@
 ---
-name: sdk-reference
+name: marketplace-sdk-reference
 description: Sitecore Marketplace SDK API reference. Use when the user asks about SDK methods, types, queries, mutations, subscriptions, or how to use any Sitecore Marketplace SDK API.
 ---
 

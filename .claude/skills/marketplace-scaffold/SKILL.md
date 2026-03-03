@@ -1,5 +1,5 @@
 ---
-name: scaffold-app
+name: marketplace-scaffold
 description: Scaffolds a new Sitecore Marketplace app using the official SDK. Use when the user wants to create a new marketplace app, start a new Sitecore project, or initialize a marketplace integration.
 argument-hint: "[app-name]"
 ---
@@ -97,10 +97,10 @@ npm run dev
 ## Step 4: Explain Next Steps
 
 After successful scaffold, suggest:
-- Use `/add-extension-point` to add extension point routes (custom fields, dashboard widgets, etc.)
-- Use `/sdk-reference` to look up SDK APIs
-- Use `/build-component` to build UI with the Blok design system
-- Use `/deploy-vercel` when ready to deploy
+- Use `/marketplace-add-extension` to add extension point routes (custom fields, dashboard widgets, etc.)
+- Use `/marketplace-sdk-reference` to look up SDK APIs
+- Use `/marketplace-build-component` to build UI with the Blok design system
+- Use `/marketplace-deploy` when ready to deploy
 
 ## Reference Files
 - [Architecture Guide](references/architecture-guide.md) — Decision matrix for client-side vs full-stack

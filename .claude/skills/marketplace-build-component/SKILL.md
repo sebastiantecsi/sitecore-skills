@@ -1,5 +1,5 @@
 ---
-name: build-component
+name: marketplace-build-component
 description: Builds UI components using the Blok design system for Sitecore Marketplace apps. Use when the user wants to create UI, add components, build a page layout, or work with Blok/shadcn components in a marketplace app.
 ---
 

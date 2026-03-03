@@ -1,5 +1,5 @@
 ---
-name: add-ai-skill
+name: marketplace-add-ai
 description: Adds AI Skills integration (Brand Review API) to a Sitecore Marketplace app. Use when the user wants to add AI-powered content analysis, brand review, or brand compliance checking.
 ---
 
@@ -33,8 +33,8 @@ See [ai-patterns.md](references/ai-patterns.md) for complete code patterns.
 
 ## Step 4: Suggest Related Skills
 
-- Use `/build-component` to build the review results UI
-- Use `/sdk-reference` for detailed type information
+- Use `/marketplace-build-component` to build the review results UI
+- Use `/marketplace-sdk-reference` for detailed type information
 
 ## Reference Files
 - [AI Patterns](references/ai-patterns.md) — Brand Review API code patterns

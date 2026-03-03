@@ -1,0 +1,16 @@
+{
+  "name": "sitecore-marketplace",
+  "owner": {
+    "name": "vercel-labs"
+  },
+  "metadata": {
+    "description": "Claude Code skills for building Sitecore Marketplace apps — scaffolding, SDK integration, Blok UI, and deployment",
+    "version": "1.0.0"
+  },
+  "plugins": [
+    {
+      "name": "sitecore-skills",
+      "source": "./"
+    }
+  ]
+}

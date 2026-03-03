@@ -1,5 +1,5 @@
 ---
-name: add-xmc-api
+name: marketplace-add-xmc
 description: Adds XM Cloud API integration to a Sitecore Marketplace app. Use when the user wants to access Sites, Pages, Authoring, Content Transfer, Search, or Agent APIs from XM Cloud.
 argument-hint: "[api-name]"
 ---
@@ -39,8 +39,8 @@ See [xmc-patterns.md](references/xmc-patterns.md) for complete code patterns for
 
 ## Step 4: Suggest Related Skills
 
-- Use `/build-component` to build UI for the data
-- Use `/sdk-reference` for detailed type information
+- Use `/marketplace-build-component` to build UI for the data
+- Use `/marketplace-sdk-reference` for detailed type information
 
 ## Reference Files
 - [XMC Patterns](references/xmc-patterns.md) — Code patterns for each XMC API

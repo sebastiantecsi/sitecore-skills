@@ -1,5 +1,5 @@
 ---
-name: add-extension-point
+name: marketplace-add-extension
 description: Adds a new extension point route to a Sitecore Marketplace app. Use when the user wants to add a custom field, dashboard widget, context panel, fullscreen page, or standalone route.
 argument-hint: "[extension-type]"
 ---
@@ -35,9 +35,9 @@ Remind the user to register the extension point in the Sitecore Developer Portal
 
 ## Step 4: Suggest Next Steps
 
-- Use `/build-component` to build out the UI
-- Use `/sdk-reference` to look up available queries/mutations for this extension type
-- Use `/add-xmc-api` if the extension needs XM Cloud data
+- Use `/marketplace-build-component` to build out the UI
+- Use `/marketplace-sdk-reference` to look up available queries/mutations for this extension type
+- Use `/marketplace-add-xmc` if the extension needs XM Cloud data
 
 ## Reference Files
 - [Extension Types](references/extension-types.md) — Boilerplate templates for each extension type

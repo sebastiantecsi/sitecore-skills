@@ -1,5 +1,5 @@
 ---
-name: deploy-vercel
+name: marketplace-deploy
 description: Deploys a Sitecore Marketplace app to Vercel with correct CSP headers and configuration.
 disable-model-invocation: true
 ---
