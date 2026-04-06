@@ -5,13 +5,22 @@
 Ensure the XMC module is registered in your client initialization (`lib/sitecore/client.ts`):
 
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
-import { xmcModule } from "@anthropic-ai/sitecore-marketplace-sdk-xmc";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { XMC } from "@sitecore-marketplace-sdk/xmc";
 
-export const client = createClient({
-  appId: process.env.NEXT_PUBLIC_SITECORE_APP_ID!,
-  modules: [xmcModule()],
+export const client = await ClientSDK.init({
+  target: window.parent,
+  modules: [XMC],
 });
+```
+
+## Getting sitecoreContextId
+
+Most XMC queries require `sitecoreContextId`. In React components, use `useAppContext()`:
+
+```typescript
+const appContext = useAppContext();
+const sitecoreContextId = appContext?.resourceAccess[0].context.live;
 ```
 
 ## Sites API Patterns
@@ -20,15 +29,25 @@ export const client = createClient({
 ```tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import type { Site } from "@sitecore-marketplace-sdk/xmc";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 
 export function SitesList() {
-  const client = useSitecoreClient();
-  const [sites, setSites] = useState<any[]>([]);
+  const { client } = useMarketplaceClient();
+  const appContext = useAppContext();
+  const [sites, setSites] = useState<Site[]>([]);
 
   useEffect(() => {
-    client.query("xmc.sites.list").then(setSites);
-  }, [client]);
+    if (!client || !appContext) return;
+    const sitecoreContextId = appContext.resourceAccess[0].context.live;
+    async function load() {
+      const { data: sites } = await client.query("xmc.sites.listSites", {
+        params: { query: { sitecoreContextId } },
+      });
+      setSites(sites);
+    }
+    load();
+  }, [client, appContext]);
 
   return (
     <ul>
@@ -40,34 +59,31 @@ export function SitesList() {
 }
 ```
 
-### Get Current Site Context
-```typescript
-const currentSite = await client.query("xmc.sites.current");
-// Subscribe to changes
-client.subscribe("xmc.sites.current.change", (site) => {
-  console.log("Site changed:", site);
-});
-```
-
 ## Pages API Patterns
 
 ### Get Current Page with Subscription
 ```tsx
 "use client";
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import type { PagesContext } from "@sitecore-marketplace-sdk/client";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 
 export function PageInfo() {
-  const client = useSitecoreClient();
-  const [page, setPage] = useState<any>(null);
+  const { client } = useMarketplaceClient();
+  const [page, setPage] = useState<PagesContext | null>(null);
 
   useEffect(() => {
-    // Get initial page
-    client.query("xmc.pages.current").then(setPage);
-
-    // Subscribe to page changes (important for context panels)
-    const unsub = client.subscribe("xmc.pages.current.change", setPage);
-    return () => unsub();
+    if (!client) return;
+    // Get initial page context and subscribe to changes
+    let cleanup: (() => void) | undefined;
+    client.query("pages.context", {
+      subscribe: true,
+      onSuccess: setPage,
+    }).then(({ data, unsubscribe }) => {
+      setPage(data);
+      cleanup = unsubscribe;
+    });
+    return () => cleanup?.();
   }, [client]);
 
   if (!page) return null;
@@ -75,98 +91,70 @@ export function PageInfo() {
 }
 ```
 
+### Get a Specific Page
+```typescript
+const { data: appContext } = await client.query("application.context");
+const sitecoreContextId = appContext.resourceAccess[0].context.live;
+
+const { data: page } = await client.query("xmc.pages.retrievePage", {
+  params: {
+    path: { pageId: "page-id" },
+    query: { site: "site-name", sitecoreContextId, language: "en" },
+  },
+});
+```
+
 ## Authoring API Patterns (GraphQL)
 
 ### Query Items
 ```typescript
-const result = await client.query("xmc.authoring.query", {
-  query: `
-    query GetItem($path: String!) {
-      item(path: $path) {
-        id
-        name
-        fields {
-          name
-          value
-        }
-        children {
-          nodes {
+const { data } = await client.mutate("xmc.authoring.graphql", {
+  params: {
+    query: { sitecoreContextId },
+    body: {
+      query: `
+        query GetItem($path: String!) {
+          item(path: $path, language: "en") {
             id
             name
+            fields { name value }
+            children { results { id name } }
           }
         }
-      }
-    }
-  `,
-  variables: { path: "/sitecore/content/Home" },
+      `,
+      variables: { path: "/sitecore/content/Home" },
+    },
+  },
 });
 ```
 
 ### Mutate Items
 ```typescript
-const result = await client.mutate("xmc.authoring.mutate", {
-  query: `
-    mutation CreateItem($parentId: ID!, $name: String!, $templateId: ID!) {
-      createItem(input: {
-        parentId: $parentId
-        name: $name
-        templateId: $templateId
-      }) {
-        item {
-          id
-          name
+const { data } = await client.mutate("xmc.authoring.graphql", {
+  params: {
+    query: { sitecoreContextId },
+    body: {
+      query: `
+        mutation UpdateField($itemId: ID!, $fieldName: String!, $value: String!) {
+          updateItem(input: { itemId: $itemId, fields: [{ name: $fieldName, value: $value }] }) {
+            item { id }
+          }
         }
-      }
-    }
-  `,
-  variables: {
-    parentId: "parent-item-id",
-    name: "New Item",
-    templateId: "template-id",
+      `,
+      variables: { itemId: "item-id", fieldName: "Title", value: "New Title" },
+    },
   },
-});
-```
-
-## Search API Patterns
-
-### Search Content
-```typescript
-const results = await client.query("xmc.search.query", {
-  query: "hero banner",
-  siteId: "site-id",
-  // Optional filters
-  // templateId: "template-id",
-  // language: "en",
 });
 ```
 
 ## Content Transfer API Patterns
 
-### Export Content
 ```typescript
-const exportResult = await client.mutate("xmc.contentTransfer.export", {
-  itemIds: ["item-id-1", "item-id-2"],
-  includeChildren: true,
-});
-
-// Check status
-const status = await client.query("xmc.contentTransfer.status", {
-  transferId: exportResult.transferId,
-});
-```
-
-## Agent API Patterns
-
-### Invoke Agent
-```typescript
-const result = await client.mutate("xmc.agent.invoke", {
-  agentId: "agent-id",
-  input: { /* agent-specific input */ },
-});
-
-// Check status
-const status = await client.query("xmc.agent.status", {
-  executionId: result.executionId,
+const { data } = await client.mutate("xmc.contentTransfer.createContentTransfer", {
+  params: {
+    query: { sitecoreContextId },
+    body: { /* transfer options */ },
+  },
 });
 ```
 
@@ -175,17 +163,19 @@ const status = await client.query("xmc.agent.status", {
 ### API Route
 ```typescript
 // app/api/sites/route.ts
-import { experimental_createXMCClient } from "@anthropic-ai/sitecore-marketplace-sdk-xmc/server";
+import { experimental_createXMCClient } from "@sitecore-marketplace-sdk/xmc";
 import { getAccessToken } from "@auth0/nextjs-auth0";
 
 export async function GET() {
   const { accessToken } = await getAccessToken();
   const xmcClient = await experimental_createXMCClient({
-    accessToken: accessToken!,
+    getAccessToken: async () => accessToken!,
   });
 
-  const sites = await xmcClient.sites.list();
-  return Response.json(sites);
+  const languages = await xmcClient.sites.listLanguages({
+    query: { sitecoreContextId: "your-context-id" },
+  });
+  return Response.json(languages);
 }
 ```
 
@@ -193,22 +183,13 @@ export async function GET() {
 ```typescript
 // app/actions.ts
 "use server";
-import { experimental_createXMCClient } from "@anthropic-ai/sitecore-marketplace-sdk-xmc/server";
+import { experimental_createXMCClient } from "@sitecore-marketplace-sdk/xmc";
 import { getAccessToken } from "@auth0/nextjs-auth0";
 
-export async function getSites() {
+export async function getXmcClient() {
   const { accessToken } = await getAccessToken();
-  const xmcClient = await experimental_createXMCClient({
-    accessToken: accessToken!,
+  return experimental_createXMCClient({
+    getAccessToken: async () => accessToken!,
   });
-  return xmcClient.sites.list();
-}
-
-export async function queryAuthoring(query: string, variables: Record<string, any>) {
-  const { accessToken } = await getAccessToken();
-  const xmcClient = await experimental_createXMCClient({
-    accessToken: accessToken!,
-  });
-  return xmcClient.authoring.query({ query, variables });
 }
 ```

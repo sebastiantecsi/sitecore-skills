@@ -5,12 +5,12 @@
 Ensure the AI module is registered in your client initialization (`lib/sitecore/client.ts`):
 
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
-import { aiModule } from "@anthropic-ai/sitecore-marketplace-sdk-ai";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { AI } from "@sitecore-marketplace-sdk/ai";
 
-export const client = createClient({
-  appId: process.env.NEXT_PUBLIC_SITECORE_APP_ID!,
-  modules: [aiModule()],
+export const client = await ClientSDK.init({
+  target: window.parent,
+  modules: [AI],
 });
 ```
 
@@ -19,28 +19,48 @@ export const client = createClient({
 ```tsx
 "use client";
 import { useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+interface BrandReviewIssue {
+  severity: "error" | "warning" | "info";
+  category: string;
+  description: string;
+  suggestion?: string;
+}
+
+interface BrandReview {
+  score: number;
+  summary: string;
+  issues: BrandReviewIssue[];
+}
+
 export function BrandReviewText() {
-  const client = useSitecoreClient();
+  const { client } = useMarketplaceClient();
+  const appContext = useAppContext();
+  const [brandkitId, setBrandkitId] = useState("");
   const [content, setContent] = useState("");
-  const [guidelines, setGuidelines] = useState("");
-  const [review, setReview] = useState<any>(null);
+  const [review, setReview] = useState<BrandReview | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const handleReview = async () => {
+    if (!client || !appContext) return;
+    const sitecoreContextId = appContext.resourceAccess[0].context.live;
     setLoading(true);
     setError(null);
     try {
-      const result = await client.mutate("ai.skills.generateBrandReview", {
-        content: { type: "text", value: content },
-        brandGuidelines: guidelines,
+      const { data: result } = await client.mutate("ai.skills.generateBrandReview", {
+        body: {
+          brandkitId,
+          input: { text: content },
+        },
+          query: { sitecoreContextId },
       });
       setReview(result);
     } catch (err) {
@@ -52,17 +72,17 @@ export function BrandReviewText() {
 
   return (
     <div className="space-y-4">
+      <Input
+        placeholder="Brand kit ID..."
+        value={brandkitId}
+        onChange={(e) => setBrandkitId(e.target.value)}
+      />
       <Textarea
         placeholder="Paste content to review..."
         value={content}
         onChange={(e) => setContent(e.target.value)}
       />
-      <Textarea
-        placeholder="Brand guidelines..."
-        value={guidelines}
-        onChange={(e) => setGuidelines(e.target.value)}
-      />
-      <Button onClick={handleReview} disabled={loading || !content}>
+      <Button onClick={handleReview} disabled={loading || !content || !brandkitId}>
         {loading ? "Reviewing..." : "Review Content"}
       </Button>
 
@@ -84,7 +104,7 @@ export function BrandReviewText() {
           </CardHeader>
           <CardContent className="space-y-2">
             <p>{review.summary}</p>
-            {review.issues?.map((issue: any, i: number) => (
+            {review.issues?.map((issue, i) => (
               <Alert key={i} variant={issue.severity === "error" ? "destructive" : "default"}>
                 <AlertDescription>
                   <strong>{issue.category}:</strong> {issue.description}
@@ -103,70 +123,67 @@ export function BrandReviewText() {
 ## Client-Side: Image Review
 
 ```typescript
-// From a file input
-const file = inputElement.files[0];
-const reader = new FileReader();
-reader.onload = async () => {
-  const base64 = (reader.result as string).split(",")[1];
-  const review = await client.mutate("ai.skills.generateBrandReview", {
-    content: {
-      type: "image",
-      value: base64,
-      mimeType: file.type, // "image/png", "image/jpeg", etc.
-    },
-    brandGuidelines: "Brand colors: #0046BE (blue), #FFFFFF (white). Logo must be visible.",
-  });
-};
-reader.readAsDataURL(file);
+const { data: appContext } = await client.query("application.context");
+const sitecoreContextId = appContext.resourceAccess[0].context.live;
 
 // From a URL
-const review = await client.mutate("ai.skills.generateBrandReview", {
-  content: {
-    type: "image",
-    url: "https://example.com/banner.png",
+const { data: review } = await client.mutate("ai.skills.generateBrandReview", {
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: {
+      banner: {
+        name: "banner.png",
+        type: "image",
+        url: "https://example.com/banner.png",
+        mimeType: "image/png",
+      },
+    },
   },
-  brandGuidelines: "Minimum contrast ratio 4.5:1. No competitor logos.",
+  query: { sitecoreContextId },
 });
 ```
 
 ## Client-Side: Document Review
 
 ```typescript
-// PDF review
-const file = inputElement.files[0]; // .pdf file
-const reader = new FileReader();
-reader.onload = async () => {
-  const base64 = (reader.result as string).split(",")[1];
-  const review = await client.mutate("ai.skills.generateBrandReview", {
-    content: {
-      type: "document",
-      value: base64,
-      mimeType: "application/pdf",
+const { data: appContext } = await client.query("application.context");
+const sitecoreContextId = appContext.resourceAccess[0].context.live;
+
+// From a URL
+const { data: review } = await client.mutate("ai.skills.generateBrandReview", {
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: {
+      campaign: {
+        name: "brief.pdf",
+        type: "document",
+        url: "https://example.com/brief.pdf",
+        mimeType: "application/pdf",
+      },
     },
-    brandGuidelines: "Follow AP style. Max reading level: grade 8. Use active voice.",
-  });
-};
-reader.readAsDataURL(file);
+  },
+  query: { sitecoreContextId },
+});
 ```
 
 ## Server-Side: API Route (Auth0 Required)
 
 ```typescript
 // app/api/brand-review/route.ts
-import { experimental_createAIClient } from "@anthropic-ai/sitecore-marketplace-sdk-ai/server";
+import { experimental_createAIClient } from "@sitecore-marketplace-sdk/ai";
 import { getAccessToken } from "@auth0/nextjs-auth0";
 
 export async function POST(request: Request) {
   const { accessToken } = await getAccessToken();
   const aiClient = await experimental_createAIClient({
-    accessToken: accessToken!,
+    getAccessToken: async () => accessToken!,
   });
 
-  const { content, brandGuidelines } = await request.json();
+  const { brandkitId, input, sitecoreContextId } = await request.json();
 
   const review = await aiClient.skills.generateBrandReview({
-    content,
-    brandGuidelines,
+    body: { brandkitId, input },
+    query: { sitecoreContextId },
   });
 
   return Response.json(review);
@@ -178,42 +195,22 @@ export async function POST(request: Request) {
 ```typescript
 // app/actions.ts
 "use server";
-import { experimental_createAIClient } from "@anthropic-ai/sitecore-marketplace-sdk-ai/server";
+import { experimental_createAIClient } from "@sitecore-marketplace-sdk/ai";
 import { getAccessToken } from "@auth0/nextjs-auth0";
 
-export async function reviewContent(text: string, guidelines: string) {
+export async function reviewContent(
+  brandkitId: string,
+  text: string,
+  sitecoreContextId: string
+) {
   const { accessToken } = await getAccessToken();
   const aiClient = await experimental_createAIClient({
-    accessToken: accessToken!,
+    getAccessToken: async () => accessToken!,
   });
 
   return aiClient.skills.generateBrandReview({
-    content: { type: "text", value: text },
-    brandGuidelines: guidelines,
+    body: { brandkitId, input: { text } },
+    query: { sitecoreContextId },
   });
-}
-```
-
-## Brand Review Response Handling
-
-```typescript
-interface BrandReviewResult {
-  score: number;               // 0-100
-  summary: string;
-  issues: {
-    severity: "error" | "warning" | "info";
-    category: string;          // "tone", "visual", "terminology", etc.
-    description: string;
-    location?: string;
-    suggestion?: string;
-  }[];
-  suggestions: string[];
-}
-
-// Helper to categorize score
-function getScoreStatus(score: number) {
-  if (score >= 80) return { label: "Excellent", variant: "default" as const };
-  if (score >= 60) return { label: "Needs Work", variant: "secondary" as const };
-  return { label: "Poor", variant: "destructive" as const };
 }
 ```

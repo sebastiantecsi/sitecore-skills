@@ -1,89 +1,84 @@
 # Client Package API Reference
 
-## createClient(options)
+## ClientSDK.init(config)
 
 Creates and initializes the SDK client.
 
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
-const client = createClient({
-  appId: string;          // Required: App ID from Developer Portal
+const client = await ClientSDK.init({
+  target: window.parent,  // Required: target window (typically window.parent)
   modules?: Module[];     // Optional: Additional modules (XMC, AI)
 });
 ```
 
 ## QueryMap — Available Queries
 
-Queries are read-only operations that fetch data from the host application.
+Results are returned as `{ data, unsubscribe? }`. All keys support `subscribe: true` for live updates.
 
 | Query Key | Description | Returns |
 |-----------|-------------|---------|
-| `app.context` | Get current app context (user, org, env) | `AppContext` |
-| `app.theme` | Get current theme (light/dark) | `Theme` |
-| `app.locale` | Get current locale | `Locale` |
-| `app.viewport` | Get current viewport dimensions | `Viewport` |
+| `application.context` | App context incl. `sitecoreContextId` | `ApplicationContext` |
+| `host.user` | Current user info | `UserInfo` |
+| `host.state` | Current host state | `XmcXmAppsHostState \| XmcPagesContextViewHostState` |
+| `host.route` | Current host route | `string` |
+| `pages.context` | Current page context (Pages editor) | `PagesContext` |
+| `site.context` | Current site context | `SiteContext` |
 
 ### Usage
 ```typescript
-const context = await client.query("app.context");
-// { user: { id, email, name }, organization: { id, name }, environment: { id, name } }
+const { data: appContext } = await client.query("application.context");
+// sitecoreContextId: appContext.resourceAccess[0].context.live
 
-const theme = await client.query("app.theme");
-// { mode: "light" | "dark" }
+const { data: user } = await client.query("host.user");
 
-const locale = await client.query("app.locale");
-// { language: "en", country: "US" }
+const { data: hostState } = await client.query("host.state");
+
+const { data: route } = await client.query("host.route");
 ```
 
 ## MutationMap — Available Mutations
 
-Mutations perform actions in the host application.
-
 | Mutation Key | Description | Params |
 |-------------|-------------|--------|
-| `app.toast` | Show a toast notification | `{ message: string, type?: "success" \| "error" \| "info" }` |
-| `app.navigate` | Navigate the host app | `{ url: string }` |
-| `app.resize` | Resize the app iframe | `{ height: number }` |
-| `app.modal.open` | Open a modal dialog | `{ url: string, title?: string, size?: "sm" \| "md" \| "lg" }` |
-| `app.modal.close` | Close current modal | `{}` |
+| `pages.context` | Navigate to a page in the Pages editor | `{ itemId: string }` |
+| `pages.reloadCanvas` | Reload the Pages canvas | none |
 
 ### Usage
 ```typescript
-// Show a toast
-await client.mutate("app.toast", { message: "Saved!", type: "success" });
-
-// Resize iframe
-await client.mutate("app.resize", { height: 600 });
-
-// Open modal
-await client.mutate("app.modal.open", {
-  url: "/modal-content",
-  title: "Edit Item",
-  size: "lg",
+// Navigate to a different page
+await client.mutate("pages.context", {
+  params: { itemId: "{12345678-ABCD-1234-ABCD-123456789ABC}" },
 });
+
+// Reload the canvas after content changes
+await client.mutate("pages.reloadCanvas");
 ```
 
-## SubscribeMap — Available Subscriptions
+## Subscriptions
 
-Subscriptions listen for real-time events from the host application.
+Subscriptions use the `query()` method with `subscribe: true` — there is no separate `subscribe()` method.
 
-| Subscription Key | Description | Data |
-|-----------------|-------------|------|
-| `app.theme.change` | Theme changed | `Theme` |
-| `app.locale.change` | Locale changed | `Locale` |
-| `app.viewport.change` | Viewport resized | `Viewport` |
-| `app.context.change` | App context changed | `AppContext` |
-
-### Usage
 ```typescript
-// Subscribe to theme changes
-const unsubscribe = client.subscribe("app.theme.change", (theme) => {
-  console.log("Theme changed:", theme.mode);
+// Subscribe to host state changes
+const { unsubscribe } = await client.query("host.state", {
+  subscribe: true,
+  onSuccess: (newState) => {
+    console.log("Host state changed:", newState);
+  },
 });
 
-// Cleanup
-unsubscribe();
+// Subscribe to page context changes (Pages editor)
+const { unsubscribe } = await client.query("pages.context", {
+  subscribe: true,
+  onSuccess: (pagesContext) => {
+    console.log("Page changed:", pagesContext);
+  },
+});
+
+// Always clean up subscriptions
+unsubscribe?.();
 ```
 
 ## React Hooks
@@ -91,45 +86,10 @@ unsubscribe();
 The scaffold generates React hooks for convenient SDK access:
 
 ```typescript
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import { useMarketplaceClient } from "@/components/providers/marketplace";
 
 function MyComponent() {
-  const client = useSitecoreClient();
-
-  // Use client.query(), client.mutate(), client.subscribe()
-}
-```
-
-## TypeScript Types
-
-```typescript
-interface AppContext {
-  user: {
-    id: string;
-    email: string;
-    name: string;
-  };
-  organization: {
-    id: string;
-    name: string;
-  };
-  environment: {
-    id: string;
-    name: string;
-  };
-}
-
-interface Theme {
-  mode: "light" | "dark";
-}
-
-interface Locale {
-  language: string;
-  country: string;
-}
-
-interface Viewport {
-  width: number;
-  height: number;
+  const { client } = useMarketplaceClient();
+  // Use client?.query(), client?.mutate()
 }
 ```

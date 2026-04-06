@@ -10,30 +10,17 @@ A custom field appears inline in the Sitecore content editor. It receives and re
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function CustomFieldPage() {
-  const client = useSitecoreClient();
+  const { client } = useMarketplaceClient();
+  const appContext = useAppContext();
   const [value, setValue] = useState("");
-  const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function init() {
-      try {
-        // Get the current field value from the host
-        const context = await client.query("app.context");
-        // Field value would come from the extension point context
-        setLoading(false);
-      } catch (err) {
-        console.error("Failed to initialize:", err);
-        setLoading(false);
-      }
-    }
-    init();
-  }, [client]);
+  const loading = !appContext;
 
   const handleChange = async (newValue: string) => {
     setValue(newValue);
@@ -67,23 +54,25 @@ A widget displayed on the Sitecore dashboard. Good for stats, summaries, and qui
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import type { UserInfo } from "@sitecore-marketplace-sdk/client";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function DashboardWidgetPage() {
-  const client = useSitecoreClient();
-  const [data, setData] = useState<any>(null);
+  const { client } = useMarketplaceClient();
+  const [data, setData] = useState<UserInfo | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (!client) return;
     async function fetchData() {
       try {
-        const context = await client.query("app.context");
-        setData(context);
+        const { data: user } = await client.query("host.user");
+        setData(user);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Failed to load");
       } finally {
@@ -112,9 +101,9 @@ export default function DashboardWidgetPage() {
         <CardTitle>My Widget</CardTitle>
       </CardHeader>
       <CardContent className="space-y-4">
-        <p>Welcome, {data?.user?.name}</p>
-        <Button onClick={() => client.mutate("app.toast", { message: "Hello!" })}>
-          Say Hello
+        <p>Welcome, {data?.name}</p>
+        <Button onClick={() => client?.mutate("pages.reloadCanvas")}>
+          Reload Canvas
         </Button>
       </CardContent>
     </Card>
@@ -132,36 +121,35 @@ A side panel in the Pages editor. Receives current page context and can subscrib
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import type { PagesContext } from "@sitecore-marketplace-sdk/client";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function PagesContextPanelPage() {
-  const client = useSitecoreClient();
-  const [page, setPage] = useState<any>(null);
+  const { client } = useMarketplaceClient();
+  const [page, setPage] = useState<PagesContext | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function init() {
-      try {
-        const currentPage = await client.query("xmc.pages.current");
-        setPage(currentPage);
-      } catch (err) {
-        console.error("Failed to load page context:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    init();
+    if (!client) return;
+    let cleanup: (() => void) | undefined;
 
-    // Subscribe to page changes
-    const unsubscribe = client.subscribe("xmc.pages.current.change", (newPage) => {
-      setPage(newPage);
+    client.query("pages.context", {
+      subscribe: true,
+      onSuccess: setPage,
+    }).then(({ data, unsubscribe }) => {
+      setPage(data);
+      cleanup = unsubscribe;
+      setLoading(false);
+    }).catch((err) => {
+      console.error("Failed to load page context:", err);
+      setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => cleanup?.();
   }, [client]);
 
   if (loading) {
@@ -204,7 +192,8 @@ A full-page experience within the Sitecore shell. Use for complex CRUD interface
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import type { ApplicationContext } from "@sitecore-marketplace-sdk/client";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
@@ -218,23 +207,9 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 
 export default function FullscreenPage() {
-  const client = useSitecoreClient();
-  const [context, setContext] = useState<any>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function init() {
-      try {
-        const ctx = await client.query("app.context");
-        setContext(ctx);
-      } catch (err) {
-        console.error("Failed to initialize:", err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    init();
-  }, [client]);
+  const { client } = useMarketplaceClient();
+  const context = useAppContext();
+  const loading = !context;
 
   if (loading) {
     return (

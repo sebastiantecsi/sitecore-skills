@@ -18,15 +18,15 @@ You are the reference guide for the Sitecore Marketplace SDK (v0.4). Answer ques
 
 The SDK has 3 packages:
 
-### `@anthropic-ai/sitecore-marketplace-sdk-client` (required)
-The core client. Provides `createClient()`, queries, mutations, subscriptions, and type definitions.
+### `@sitecore-marketplace-sdk/client` (required)
+The core client. Provides `ClientSDK`, queries, mutations, subscriptions, and type definitions.
 - See [client-api.md](references/client-api.md) for full API reference
 
-### `@anthropic-ai/sitecore-marketplace-sdk-xmc`
+### `@sitecore-marketplace-sdk/xmc`
 XM Cloud APIs for Sites, Pages, Authoring, Content Transfer, Search, and Agent.
 - See [xmc-api.md](references/xmc-api.md) for full API reference
 
-### `@anthropic-ai/sitecore-marketplace-sdk-ai`
+### `@sitecore-marketplace-sdk/ai`
 AI Skills APIs for Brand Review.
 - See [ai-api.md](references/ai-api.md) for full API reference
 
@@ -34,25 +34,27 @@ AI Skills APIs for Brand Review.
 
 ### Client Initialization
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
 
-const client = createClient({
-  appId: process.env.NEXT_PUBLIC_SITECORE_APP_ID!,
+const client = await ClientSDK.init({
+  target: window.parent,
 });
 ```
 
 ### Common Patterns
 ```typescript
-// Query
-const result = await client.query("queryName", params);
+// Query — returns { data, unsubscribe? }
+const { data } = await client.query("queryName", params);
 
 // Mutation
-const result = await client.mutate("mutationName", params);
+const { data } = await client.mutate("mutationName", params);
 
-// Subscription
-const unsubscribe = client.subscribe("eventName", (data) => {
-  console.log(data);
+// Subscription — use query() with subscribe: true
+const { unsubscribe } = await client.query("queryName", {
+  subscribe: true,
+  onSuccess: (data) => console.log(data),
 });
+unsubscribe?.();
 ```
 
 ## Reference Files

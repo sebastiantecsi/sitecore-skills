@@ -61,29 +61,16 @@ See [blok-components.md](references/blok-components.md) for the full component c
 "use client";
 
 import { useEffect, useState } from "react";
-import { useSitecoreClient } from "@/hooks/use-sitecore";
+import { useMarketplaceClient, useAppContext } from "@/components/providers/marketplace";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export function MyComponent() {
-  const client = useSitecoreClient();
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { client } = useMarketplaceClient();
+  const appContext = useAppContext();
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function fetchData() {
-      try {
-        const result = await client.query("app.context");
-        setData(result);
-      } catch (err) {
-        setError(err instanceof Error ? err.message : "Failed to load");
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchData();
-  }, [client]);
+  const loading = !appContext;
 
   if (loading) return <Skeleton className="h-32 w-full" />;
   if (error) return <Alert variant="destructive"><AlertDescription>{error}</AlertDescription></Alert>;

@@ -16,7 +16,7 @@
 
 | Package | Registry URL | Provides |
 |---------|-------------|----------|
-| **Client** (required) | `app-client.json` | `createClient()`, queries, mutations, subscriptions, types |
+| **Client** (required) | `app-client.json` | `ClientSDK.init()`, queries, mutations, subscriptions, types |
 | **XM Cloud** | `xmc.json` | Sites, Pages, Authoring (GraphQL), Content Transfer, Search, Agent APIs |
 | **AI Skills** | `ai.json` | Brand Review API for AI-powered content analysis |
 | **Blok Theme** | `blok-theme.json` | Sitecore-branded shadcn components (always install) |
@@ -24,7 +24,7 @@
 ## What the Scaffold Creates
 
 ### Client-side (`app-client.json`)
-- `lib/sitecore/client.ts` — Client initialization with `createClient()`
+- `lib/sitecore/client.ts` — Client initialization with `ClientSDK.init()`
 - `lib/sitecore/providers.tsx` — React context providers (`<SitecoreProvider>`)
 - `hooks/use-sitecore.ts` — React hooks for SDK access
 - `app/layout.tsx` updates — Wraps app in providers

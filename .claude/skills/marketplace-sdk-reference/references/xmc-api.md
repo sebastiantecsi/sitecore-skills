@@ -3,81 +3,76 @@
 ## Module Registration
 
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
-import { xmcModule } from "@anthropic-ai/sitecore-marketplace-sdk-xmc";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { XMC } from "@sitecore-marketplace-sdk/xmc";
 
-const client = createClient({
-  appId: process.env.NEXT_PUBLIC_SITECORE_APP_ID!,
-  modules: [xmcModule()],
+const client = await ClientSDK.init({
+  target: window.parent,
+  modules: [XMC],
 });
 ```
 
 ## Client-Side APIs
 
-All XMC queries and mutations are prefixed with `xmc.`.
+All XMC queries and mutations are prefixed with `xmc.`. Most require `sitecoreContextId`, obtained from `application.context`:
+
+```typescript
+const { data: appContext } = await client.query("application.context");
+const sitecoreContextId = appContext.resourceAccess[0].context.live;
+```
 
 ### Sites API
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `xmc.sites.list` | Query | List all sites |
-| `xmc.sites.get` | Query | Get site by ID |
-| `xmc.sites.current` | Query | Get current site context |
+| `xmc.sites.listSites` | Query | List all sites |
 
 ```typescript
-const sites = await client.query("xmc.sites.list");
-const site = await client.query("xmc.sites.get", { id: "site-id" });
-const current = await client.query("xmc.sites.current");
+const { data: sites } = await client.query("xmc.sites.listSites", {
+  params: {
+    query: { sitecoreContextId },
+  },
+});
 ```
 
 ### Pages API
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `xmc.pages.current` | Query | Get current page context |
-| `xmc.pages.list` | Query | List pages for a site |
-| `xmc.pages.get` | Query | Get page by ID |
+| `xmc.pages.retrievePage` | Query | Get a specific page by ID |
 
 ```typescript
-const currentPage = await client.query("xmc.pages.current");
-const pages = await client.query("xmc.pages.list", { siteId: "site-id" });
+const { data: page } = await client.query("xmc.pages.retrievePage", {
+  params: {
+    path: { pageId },
+    query: { site, sitecoreContextId, language },
+  },
+});
 ```
 
 ### Authoring API (GraphQL)
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `xmc.authoring.query` | Query | Execute a GraphQL query against XM Cloud Authoring API |
-| `xmc.authoring.mutate` | Mutation | Execute a GraphQL mutation |
+| `xmc.authoring.graphql` | Mutation | Execute a GraphQL query/mutation against XM Cloud Authoring API |
 
 ```typescript
-// GraphQL query through SDK
-const result = await client.query("xmc.authoring.query", {
-  query: \`
-    query GetItem($path: String!) {
-      item(path: $path) {
-        id
-        name
-        fields {
-          name
-          value
+const { data } = await client.mutate("xmc.authoring.graphql", {
+  params: {
+    query: { sitecoreContextId },
+    body: {
+      query: `
+        query GetItem($path: String!) {
+          item(path: $path, language: "en") {
+            id
+            name
+            fields { name value }
+          }
         }
-      }
-    }
-  \`,
-  variables: { path: "/sitecore/content/Home" },
-});
-
-// GraphQL mutation
-await client.mutate("xmc.authoring.mutate", {
-  query: \`
-    mutation UpdateField($itemId: ID!, $fieldName: String!, $value: String!) {
-      updateItem(input: { itemId: $itemId, fields: [{ name: $fieldName, value: $value }] }) {
-        item { id }
-      }
-    }
-  \`,
-  variables: { itemId: "item-id", fieldName: "Title", value: "New Title" },
+      `,
+      variables: { path: "/sitecore/content/Home" },
+    },
+  },
 });
 ```
 
@@ -85,61 +80,37 @@ await client.mutate("xmc.authoring.mutate", {
 
 | Key | Type | Description |
 |-----|------|-------------|
-| `xmc.contentTransfer.export` | Mutation | Export content |
-| `xmc.contentTransfer.import` | Mutation | Import content |
-| `xmc.contentTransfer.status` | Query | Check transfer status |
+| `xmc.contentTransfer.createContentTransfer` | Mutation | Create a content transfer |
 
-### Search API
+### Page Context Subscription
 
-| Key | Type | Description |
-|-----|------|-------------|
-| `xmc.search.query` | Query | Search content items |
+Subscribe to page changes using the base `pages.context` query with `subscribe: true`:
 
 ```typescript
-const results = await client.query("xmc.search.query", {
-  query: "hero banner",
-  siteId: "site-id",
+const { unsubscribe } = await client.query("pages.context", {
+  subscribe: true,
+  onSuccess: (pagesContext) => {
+    console.log("Page changed:", pagesContext);
+  },
 });
+unsubscribe?.();
 ```
-
-### Agent API
-
-| Key | Type | Description |
-|-----|------|-------------|
-| `xmc.agent.invoke` | Mutation | Invoke an XM Cloud agent |
-| `xmc.agent.status` | Query | Check agent execution status |
 
 ## Server-Side Client
 
-For full-stack (Auth0) apps, use the server-side client in API routes or server actions:
+For full-stack (Auth0) apps, use the server-side client in API routes or Server Actions:
 
 ```typescript
-import { experimental_createXMCClient } from "@anthropic-ai/sitecore-marketplace-sdk-xmc/server";
+import { experimental_createXMCClient } from "@sitecore-marketplace-sdk/xmc";
 
-// In a Next.js API route or Server Action
 const xmcClient = await experimental_createXMCClient({
-  accessToken: session.accessToken, // From Auth0
+  getAccessToken: async () => {
+    // Return the access token from your auth provider (e.g. Auth0)
+    return await getYourAccessToken();
+  },
 });
 
-const sites = await xmcClient.sites.list();
-const page = await xmcClient.pages.get({ id: "page-id" });
-
-// Direct GraphQL access
-const result = await xmcClient.authoring.query({
-  query: "...",
-  variables: {},
-});
-```
-
-## Subscriptions
-
-| Key | Description | Data |
-|-----|-------------|------|
-| `xmc.pages.current.change` | Current page changed | Page context |
-| `xmc.sites.current.change` | Current site changed | Site context |
-
-```typescript
-client.subscribe("xmc.pages.current.change", (page) => {
-  console.log("Page changed:", page);
+const languages = await xmcClient.sites.listLanguages({
+  query: { sitecoreContextId: "your-context-id" },
 });
 ```

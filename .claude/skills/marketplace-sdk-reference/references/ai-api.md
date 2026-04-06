@@ -3,18 +3,18 @@
 ## Module Registration
 
 ```typescript
-import { createClient } from "@anthropic-ai/sitecore-marketplace-sdk-client";
-import { aiModule } from "@anthropic-ai/sitecore-marketplace-sdk-ai";
+import { ClientSDK } from "@sitecore-marketplace-sdk/client";
+import { AI } from "@sitecore-marketplace-sdk/ai";
 
-const client = createClient({
-  appId: process.env.NEXT_PUBLIC_SITECORE_APP_ID!,
-  modules: [aiModule()],
+const client = await ClientSDK.init({
+  target: window.parent,
+  modules: [AI],
 });
 ```
 
 ## Brand Review API
 
-The Brand Review API provides AI-powered content analysis against brand guidelines.
+The Brand Review API provides AI-powered content analysis against a brand kit configured in Sitecore.
 
 ### Client-Side
 
@@ -23,75 +23,50 @@ The Brand Review API provides AI-powered content analysis against brand guidelin
 | `ai.skills.generateBrandReview` | Mutation | Generate a brand review for content |
 
 ```typescript
+// Get sitecoreContextId from application context
+const { data: appContext } = await client.query("application.context");
+const sitecoreContextId = appContext.resourceAccess[0].context.live;
+
 // Text review
-const review = await client.mutate("ai.skills.generateBrandReview", {
-  content: {
-    type: "text",
-    value: "Your marketing copy here...",
+const { data: review } = await client.mutate("ai.skills.generateBrandReview", {
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: { text: "Your marketing copy here..." },
   },
-  brandGuidelines: "Keep tone professional and concise. Avoid jargon.",
+  query: { sitecoreContextId },
 });
 
-// Image review (base64)
-const review = await client.mutate("ai.skills.generateBrandReview", {
-  content: {
-    type: "image",
-    value: base64EncodedImage,
-    mimeType: "image/png",
+// Image review (by URL)
+const { data: review } = await client.mutate("ai.skills.generateBrandReview", {
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: {
+      banner: {
+        name: "banner.png",
+        type: "image",
+        url: "https://example.com/banner.png",
+        mimeType: "image/png",
+      },
+    },
   },
-  brandGuidelines: "Brand colors: blue (#0046BE), white. No red.",
+  query: { sitecoreContextId },
 });
 
-// Image review (URL)
-const review = await client.mutate("ai.skills.generateBrandReview", {
-  content: {
-    type: "image",
-    url: "https://example.com/banner.png",
+// Document review (by URL)
+const { data: review } = await client.mutate("ai.skills.generateBrandReview", {
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: {
+      campaign: {
+        name: "brief.pdf",
+        type: "document",
+        url: "https://example.com/brief.pdf",
+        mimeType: "application/pdf",
+      },
+    },
   },
-  brandGuidelines: "Logo must be visible. Min contrast ratio 4.5:1.",
+  query: { sitecoreContextId },
 });
-
-// Document review (PDF or text file)
-const review = await client.mutate("ai.skills.generateBrandReview", {
-  content: {
-    type: "document",
-    value: base64EncodedPDF,
-    mimeType: "application/pdf",
-  },
-  brandGuidelines: "Follow AP style. Max reading level: grade 8.",
-});
-```
-
-### Brand Review Response Type
-
-```typescript
-interface BrandReviewResult {
-  score: number;               // 0-100 brand compliance score
-  summary: string;             // Overall assessment
-  issues: BrandReviewIssue[];  // List of specific issues found
-  suggestions: string[];       // Improvement suggestions
-}
-
-interface BrandReviewIssue {
-  severity: "error" | "warning" | "info";
-  category: string;            // e.g., "tone", "visual", "terminology"
-  description: string;         // What the issue is
-  location?: string;           // Where in the content (if applicable)
-  suggestion?: string;         // How to fix it
-}
-```
-
-### Content Input Types
-
-```typescript
-type BrandReviewContent =
-  | { type: "text"; value: string }
-  | { type: "image"; value: string; mimeType: string }     // base64
-  | { type: "image"; url: string }                          // URL
-  | { type: "document"; value: string; mimeType: string };  // base64 PDF/text
-
-// Supported mimeTypes for images: "image/png", "image/jpeg", "image/webp", "image/gif"
-// Supported mimeTypes for documents: "application/pdf", "text/plain"
 ```
 
 ## Server-Side Client
@@ -99,15 +74,19 @@ type BrandReviewContent =
 For full-stack (Auth0) apps:
 
 ```typescript
-import { experimental_createAIClient } from "@anthropic-ai/sitecore-marketplace-sdk-ai/server";
+import { experimental_createAIClient } from "@sitecore-marketplace-sdk/ai";
 
-// In a Next.js API route or Server Action
 const aiClient = await experimental_createAIClient({
-  accessToken: session.accessToken, // From Auth0
+  getAccessToken: async () => {
+    return await getYourAccessToken();
+  },
 });
 
 const review = await aiClient.skills.generateBrandReview({
-  content: { type: "text", value: "Content to review..." },
-  brandGuidelines: "Brand guidelines here...",
+  body: {
+    brandkitId: "your-brand-kit-id",
+    input: { text: "Content to review..." },
+  },
+  query: { sitecoreContextId: "your-context-id" },
 });
 ```
